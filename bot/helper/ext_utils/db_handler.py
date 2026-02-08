@@ -1,12 +1,12 @@
 from aiofiles import open as aiopen
 from aiofiles.os import path as aiopath
 from importlib import import_module
-from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import AsyncMongoClient
 from pymongo.server_api import ServerApi
 from pymongo.errors import PyMongoError
 
 from ... import LOGGER, user_data, rss_dict, qbit_options
-from ...core.mltb_client import TgClient
+from ...core.telegram_manager import TgClient
 from ...core.config_manager import Config
 
 
@@ -20,10 +20,13 @@ class DbManager:
         try:
             if self._conn is not None:
                 await self._conn.close()
-            self._conn = AsyncIOMotorClient(
-                Config.DATABASE_URL, server_api=ServerApi("1")
+            self._conn = AsyncMongoClient(
+                Config.DATABASE_URL,
+                server_api=ServerApi("1"),
+                connectTimeoutMS=60000,
+                serverSelectionTimeoutMS=60000,
             )
-            self.db = self._conn.mltb
+            self.db = self._conn[Config.DATABASE_NAME]
             self._return = False
         except PyMongoError as e:
             LOGGER.error(f"Error in DB connection: {e}")

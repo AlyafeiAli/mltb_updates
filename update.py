@@ -10,10 +10,11 @@ from logging import (
     getLogger,
     ERROR,
 )
-from os import path, remove
+from os import path, remove, getenv
 from pymongo.mongo_client import MongoClient
 from pymongo.server_api import ServerApi
 from subprocess import run as srun
+from typing import Dict, Any
 
 getLogger("pymongo").setLevel(ERROR)
 
@@ -30,12 +31,29 @@ basicConfig(
     level=INFO,
 )
 
-settings = import_module("config")
-config_file = {
-    key: value.strip() if isinstance(value, str) else value
-    for key, value in vars(settings).items()
-    if not key.startswith("__")
-}
+
+def load_config() -> Dict[str, Any]:
+    """Load configuration from config module or environment variables."""
+    try:
+
+        settings = import_module("config")
+        return {
+            key: value.strip() if isinstance(value, str) else value
+            for key, value in vars(settings).items()
+            if not key.startswith("__")
+        }
+    except ModuleNotFoundError:
+        log_info("Config module not found, loading from environment variables...")
+        return {
+            "BOT_TOKEN": getenv("BOT_TOKEN", ""),
+            "DATABASE_URL": getenv("DATABASE_URL", ""),
+            "DATABASE_NAME": getenv("DATABASE_NAME", "mltb"),
+            "UPSTREAM_REPO": getenv("UPSTREAM_REPO", ""),
+            "UPSTREAM_BRANCH": getenv("UPSTREAM_BRANCH", "master"),
+        }
+
+
+config_file = load_config()
 
 BOT_TOKEN = config_file.get("BOT_TOKEN", "")
 if not BOT_TOKEN:
@@ -44,10 +62,12 @@ if not BOT_TOKEN:
 
 BOT_ID = BOT_TOKEN.split(":", 1)[0]
 
+DATABASE_NAME = config_file.get("DATABASE_NAME", "mltb")
+
 if DATABASE_URL := config_file.get("DATABASE_URL", "").strip():
     try:
         conn = MongoClient(DATABASE_URL, server_api=ServerApi("1"))
-        db = conn.mltb
+        db = conn[DATABASE_NAME]
         old_config = db.settings.deployConfig.find_one({"_id": BOT_ID}, {"_id": 0})
         config_dict = db.settings.config.find_one({"_id": BOT_ID})
         if (

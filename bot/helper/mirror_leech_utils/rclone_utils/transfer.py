@@ -1,6 +1,6 @@
 from aiofiles import open as aiopen
 from aiofiles.os import path as aiopath, makedirs, listdir
-from asyncio import create_subprocess_exec, gather, sleep, wait_for
+from asyncio import create_subprocess_exec, gather, wait_for
 from asyncio.subprocess import PIPE
 from configparser import RawConfigParser
 from json import loads
@@ -33,7 +33,6 @@ class RcloneTransferHelper:
         self._sa_index = 0
         self._sa_number = 0
         self._use_service_accounts = Config.USE_SERVICE_ACCOUNTS
-        self._rclone_select = False
 
     @property
     def transferred_size(self):
@@ -79,7 +78,6 @@ class RcloneTransferHelper:
                     self._speed,
                     self._eta,
                 ) = data[0]
-            await sleep(0.05)
 
     def _switch_service_account(self):
         if self._sa_index == self._sa_number - 1:
@@ -208,8 +206,6 @@ class RcloneTransferHelper:
             "--config",
             config_path,
             epath,
-            "-v",
-            "--log-systemd",
         ]
         res, err, code = await cmd_exec(cmd)
 
@@ -310,17 +306,12 @@ class RcloneTransferHelper:
                 fremote = f"sa{self._sa_index:03}"
                 LOGGER.info(f"Upload with service account {fremote}")
 
-        method = "move"
         cmd = self._get_updated_command(
-            fconfig_path, path, f"{fremote}:{rc_path}", method
+            fconfig_path, path, f"{fremote}:{rc_path}", "move"
         )
         if remote_type == "drive" and not self._listener.rc_flags:
             cmd.extend(
                 (
-                    "--drive-chunk-size",
-                    "128M",
-                    "--drive-upload-cutoff",
-                    "128M",
                     "--tpslimit",
                     "1",
                     "--tpslimit-burst",
@@ -350,8 +341,6 @@ class RcloneTransferHelper:
                 "--config",
                 oconfig_path,
                 destination,
-                "-v",
-                "--log-systemd",
             ]
             res, err, code = await cmd_exec(cmd)
 
@@ -429,8 +418,6 @@ class RcloneTransferHelper:
                     "--config",
                     config_path,
                     destination,
-                    "-v",
-                    "--log-systemd",
                 ]
                 res, err, code = await cmd_exec(cmd)
 
@@ -458,11 +445,10 @@ class RcloneTransferHelper:
         destination,
         method,
     ):
+        rclone_select = False
         if source.split(":")[-1].startswith("rclone_select"):
             source = f"{source.split(":")[0]}:"
-            self._rclone_select = True
-        else:
-            ext = "*.{" + ",".join(self._listener.excluded_extensions) + "}"
+            rclone_select = True
         cmd = [
             "rclone",
             method,
@@ -479,12 +465,14 @@ class RcloneTransferHelper:
             "--low-level-retries",
             "1",
             "-M",
-            "-v",
-            "--log-systemd",
         ]
-        if self._rclone_select:
+        if rclone_select:
             cmd.extend(("--files-from", self._listener.link))
+        elif self._listener.included_extensions:
+            ext = "*.{" + ",".join(self._listener.included_extensions) + "}"
+            cmd.extend(("--include", ext))
         else:
+            ext = "*.{" + ",".join(self._listener.excluded_extensions) + "}"
             cmd.extend(("--exclude", ext))
         if rcflags := self._listener.rc_flags:
             rcflags = rcflags.split("|")

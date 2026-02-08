@@ -226,7 +226,7 @@ class YtSelection:
         buttons.data_button("Back", "ytq aq back")
         buttons.data_button("Cancel", "ytq aq cancel")
         subbuttons = buttons.build_menu(5)
-        msg = f"Choose Audio{i} Qaulity:\n0 is best and 10 is worst\nTimeout: {get_readable_time(self._timeout - (time() - self._time))}"
+        msg = f"Choose Audio{i} Quality:\n0 is best and 10 is worst\nTimeout: {get_readable_time(self._timeout - (time() - self._time))}"
         await edit_message(self._reply_to, msg, subbuttons)
 
 
@@ -323,21 +323,12 @@ class YtDlp(TaskListener):
             self.multi = 0
 
         try:
-            if args["-ff"]:
-                if isinstance(args["-ff"], set):
-                    self.ffmpeg_cmds = args["-ff"]
-                else:
-                    self.ffmpeg_cmds = eval(args["-ff"])
-        except Exception as e:
-            self.ffmpeg_cmds = None
-            LOGGER.error(e)
-
-        try:
             opt = eval(args["-opt"]) if args["-opt"] else {}
         except Exception as e:
             LOGGER.error(e)
             opt = {}
 
+        self.ffmpeg_cmds = args["-ff"]
         self.select = args["-s"]
         self.name = args["-n"]
         self.up_dest = args["-up"]

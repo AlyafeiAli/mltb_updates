@@ -7,7 +7,7 @@ from .... import (
     task_dict,
     task_dict_lock,
 )
-from ....core.mltb_client import TgClient
+from ....core.telegram_manager import TgClient
 from ...ext_utils.task_manager import check_running_tasks, stop_duplicate_check
 from ...mirror_leech_utils.status_utils.queue_status import QueueStatus
 from ...mirror_leech_utils.status_utils.telegram_status import TelegramStatus
@@ -64,10 +64,10 @@ class TelegramDownloadHelper:
         await self._listener.on_download_error(error)
 
     async def _on_download_complete(self):
-        await self._listener.on_download_complete()
         async with global_lock:
-            GLOBAL_GID.remove(self._id)
-        return
+            if self._id in GLOBAL_GID:
+                GLOBAL_GID.remove(self._id)
+        await self._listener.on_download_complete()
 
     async def _download(self, message, path):
         try:
@@ -89,7 +89,6 @@ class TelegramDownloadHelper:
             await self._on_download_complete()
         elif not self._listener.is_cancelled:
             await self._on_download_error("Internal error occurred")
-        return
 
     async def add_download(self, message, path, session):
         self.session = session
